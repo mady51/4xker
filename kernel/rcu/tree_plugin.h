@@ -33,6 +33,7 @@
 #ifdef CONFIG_RCU_BOOST
 
 #include "../locking/rtmutex_common.h"
+#define RCU_BOOST_PRIO CONFIG_RCU_BOOST_PRIO
 
 /*
  * Control variables for per-CPU and per-rcu_node kthreads.  These
@@ -45,13 +46,7 @@ DEFINE_PER_CPU(char, rcu_cpu_has_work);
 
 #else /* #ifdef CONFIG_RCU_BOOST */
 
-/*
- * Some architectures do not define rt_mutexes, but if !CONFIG_RCU_BOOST,
- * all uses are in dead code.  Provide a definition to keep the compiler
- * happy, but add WARN_ON_ONCE() to complain if used in the wrong place.
- * This probably needs to be excluded from -rt builds.
- */
-#define rt_mutex_owner(a) ({ WARN_ON_ONCE(1); NULL; })
+#define RCU_BOOST_PRIO RCU_KTHREAD_PRIO
 
 #endif /* #else #ifdef CONFIG_RCU_BOOST */
 
