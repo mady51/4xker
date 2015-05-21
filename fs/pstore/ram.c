@@ -420,11 +420,6 @@ static int ramoops_init_przs(struct device *dev, struct ramoops_context *cxt,
 			err = PTR_ERR(cxt->przs[i]);
 			dev_err(dev, "failed to request mem region (0x%zx@0x%llx): %d\n",
 				cxt->record_size, (unsigned long long)*paddr, err);
-
-			while (i > 0) {
-				i--;
-				persistent_ram_free(cxt->przs[i]);
-			}
 			goto fail_prz;
 		}
 		*paddr += cxt->record_size;
