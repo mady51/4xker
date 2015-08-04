@@ -155,35 +155,10 @@ int pwm_lut_config(struct pwm_device *pwm, int period_us,
 int pwm_config_us(struct pwm_device *pwm,
 		int duty_us, int period_us);
 
-#else
-static inline int pwm_config_period(struct pwm_device *pwm,
-			     struct pwm_period_config *pwm_p)
-{
-	return -EINVAL;
-}
-
-static inline int pwm_config_pwm_value(struct pwm_device *pwm, int pwm_value)
-{
-	return -EINVAL;
-}
-
-static inline int pwm_change_mode(struct pwm_device *pwm, enum pm_pwm_mode mode)
-{
-	return -EINVAL;
-}
-
-static inline int pwm_lut_config(struct pwm_device *pwm, int period_us,
-		int duty_pct[], struct lut_params lut_params)
-{
-	return -EINVAL;
-}
-
-static inline int pwm_config_us(struct pwm_device *pwm,
-		int duty_us, int period_us)
-{
-	return -EINVAL;
-}
-#endif
+/*
+ * synchronized enable of multiple pwm instances
+ */
+int pwm_enable_synchronized(struct pwm_device **pwms, size_t num);
 
 /* Standard APIs supported */
 /*
