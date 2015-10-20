@@ -361,17 +361,9 @@ static struct kmsg_dumper pstore_dumper = {
 	.dump = pstore_dump,
 };
 
-/*
- * Register with kmsg_dump to save last part of console log on panic.
- */
 static void pstore_register_kmsg(void)
 {
 	kmsg_dump_register(&pstore_dumper);
-}
-
-static void pstore_unregister_kmsg(void)
-{
-	kmsg_dump_unregister(&pstore_dumper);
 }
 
 #ifdef CONFIG_PSTORE_CONSOLE
