@@ -582,7 +582,7 @@ static int ramoops_parse_dt(struct platform_device *pdev,
 static int ramoops_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
-	struct ramoops_platform_data *pdata = pdev->dev.platform_data;
+	struct ramoops_platform_data *pdata = platform_get_drvdata(pdev);
 	struct ramoops_context *cxt = &oops_cxt;
 	size_t dump_mem_sz;
 	phys_addr_t paddr;
@@ -694,6 +694,7 @@ static int ramoops_probe(struct platform_device *pdev)
 		cxt->size, (unsigned long long)cxt->phys_addr,
 		cxt->ecc_info.ecc_size, cxt->ecc_info.block_size);
 
+	platform_set_drvdata(pdev, pdata);
 	return 0;
 
 fail_buf:
@@ -737,7 +738,8 @@ static struct platform_driver ramoops_driver = {
 	.probe		= ramoops_probe,
 	.remove		= ramoops_remove,
 	.driver		= {
-		.name		= "ramoops",
+		.name	= "ramoops",
+		.owner	= THIS_MODULE,
 		.of_match_table	= dt_match,
 	},
 };
