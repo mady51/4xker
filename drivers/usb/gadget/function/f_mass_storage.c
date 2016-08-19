@@ -2617,6 +2617,13 @@ static int fsg_main_thread(void *common_)
 
 /*************************** DEVICE ATTRIBUTES ***************************/
 
+static ssize_t cdrom_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	struct fsg_lun		*curlun = fsg_lun_from_dev(dev);
+
+	return fsg_show_cdrom(curlun, buf);
+}
+
 static ssize_t ro_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	struct fsg_lun		*curlun = fsg_lun_from_dev(dev);
@@ -2639,6 +2646,15 @@ static ssize_t file_show(struct device *dev, struct device_attribute *attr,
 	struct rw_semaphore	*filesem = dev_get_drvdata(dev);
 
 	return fsg_show_file(curlun, filesem, buf);
+}
+
+static ssize_t cdrom_store(struct device *dev, struct device_attribute *attr,
+			const char *buf, size_t count)
+{
+	struct fsg_lun		*curlun = fsg_lun_from_dev(dev);
+	struct rw_semaphore	*filesem = dev_get_drvdata(dev);
+
+	return fsg_store_cdrom(curlun, filesem, buf, count);
 }
 
 static ssize_t ro_store(struct device *dev, struct device_attribute *attr,
@@ -2667,10 +2683,14 @@ static ssize_t file_store(struct device *dev, struct device_attribute *attr,
 	return fsg_store_file(curlun, filesem, buf, count);
 }
 
+static DEVICE_ATTR_RW(cdrom);
+static DEVICE_ATTR_RW(ro);
 static DEVICE_ATTR_RW(nofua);
-/* mode wil be set in fsg_lun_attr_is_visible() */
-static DEVICE_ATTR(ro, 0, ro_show, ro_store);
-static DEVICE_ATTR(file, 0, file_show, file_store);
+static DEVICE_ATTR_RW(file);
+static DEVICE_ATTR(perf, 0644, fsg_show_perf, fsg_store_perf);
+
+static struct device_attribute dev_attr_file_nonremovable = __ATTR_RO(file);
+
 
 /****************************** FSG COMMON ******************************/
 
@@ -2788,7 +2808,37 @@ error_release:
 }
 EXPORT_SYMBOL_GPL(fsg_common_set_num_buffers);
 
-void fsg_common_remove_lun(struct fsg_lun *lun)
+static inline void fsg_common_remove_sysfs(struct fsg_lun *lun)
+{
+	device_remove_file(&lun->dev, &dev_attr_nofua);
+	/*
+	 * device_remove_file() =>
+	 *
+	 * here the attr (e.g. dev_attr_ro) is only used to be passed to:
+	 *
+	 *	sysfs_remove_file() =>
+	 *
+	 *	here e.g. both dev_attr_ro_cdrom and dev_attr_ro are in
+	 *	the same namespace and
+	 *	from here only attr->name is passed to:
+	 *
+	 *		sysfs_hash_and_remove()
+	 *
+	 *		attr->name is the same for dev_attr_ro_cdrom and
+	 *		dev_attr_ro
+	 *		attr->name is the same for dev_attr_file and
+	 *		dev_attr_file_nonremovable
+	 *
+	 * so we don't differentiate between removing e.g. dev_attr_ro_cdrom
+	 * and dev_attr_ro
+	 */
+	device_remove_file(&lun->dev, &dev_attr_cdrom);
+	device_remove_file(&lun->dev, &dev_attr_ro);
+	device_remove_file(&lun->dev, &dev_attr_file);
+	device_remove_file(&lun->dev, &dev_attr_perf);
+}
+
+void fsg_common_remove_lun(struct fsg_lun *lun, bool sysfs)
 {
 	if (device_is_registered(&lun->dev))
 		device_unregister(&lun->dev);
@@ -2857,11 +2907,21 @@ static struct attribute *fsg_lun_dev_attrs[] = {
 	NULL
 };
 
-static umode_t fsg_lun_dev_is_visible(struct kobject *kobj,
-				      struct attribute *attr, int idx)
-{
-	struct device *dev = kobj_to_dev(kobj);
-	struct fsg_lun *lun = fsg_lun_from_dev(dev);
+	rc = device_create_file(&lun->dev, &dev_attr_cdrom);
+	if (rc)
+		goto error;
+	rc = device_create_file(&lun->dev, &dev_attr_ro);
+	if (rc)
+		goto error;
+	rc = device_create_file(&lun->dev,
+				lun->removable
+			      ? &dev_attr_file
+			      : &dev_attr_file_nonremovable);
+	if (rc)
+		goto error;
+	rc = device_create_file(&lun->dev, &dev_attr_nofua);
+	if (rc)
+		goto error;
 
 	if (attr == &dev_attr_ro.attr)
 		return lun->cdrom ? S_IRUGO : (S_IWUSR | S_IRUGO);
