@@ -1968,6 +1968,9 @@ static int msm_isp_cfg_ping_pong_address(
 	uint32_t buffer_size_byte = 0;
 	int32_t word_per_line = 0;
 	dma_addr_t paddr;
+	struct dual_vfe_resource *dual_vfe_res = NULL;
+	uint32_t vfe_id = 0;
+	unsigned long flags = 0;
 
 
 	/* Isolate pingpong_bit from pingpong_status */
@@ -3922,8 +3925,9 @@ static int msm_isp_stream_axi_cfg_update(struct vfe_device *vfe_dev,
 
 int msm_isp_update_axi_stream(struct vfe_device *vfe_dev, void *arg)
 {
-	int rc = 0, i;
-	struct msm_vfe_axi_stream *stream_info;
+	int rc = 0, i, j;
+	struct msm_vfe_axi_stream *stream_info = NULL;
+	struct msm_vfe_axi_shared_data *axi_data = &vfe_dev->axi_data;
 	struct msm_vfe_axi_stream_update_cmd *update_cmd = arg;
 	struct msm_vfe_axi_stream_cfg_update_info *update_info = NULL;
 	struct msm_isp_sw_framskip *sw_skip_info = NULL;

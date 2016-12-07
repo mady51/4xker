@@ -387,4 +387,3 @@ int kryo_pmu_init(struct arm_pmu *kryo_pmu)
 
 	return armv8pmu_probe_num_events(cpu_pmu);
 }
-

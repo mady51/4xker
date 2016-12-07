@@ -762,7 +762,7 @@ static int soc_pcm_prepare(struct snd_pcm_substream *substream)
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct snd_soc_platform *platform = rtd->platform;
 	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
-	struct snd_soc_dai *codec_dai;
+	struct snd_soc_dai *codec_dai = NULL;
 	int i, ret = 0;
 
 	mutex_lock_nested(&rtd->pcm_mutex, rtd->pcm_subclass);
@@ -820,14 +820,11 @@ static int soc_pcm_prepare(struct snd_pcm_substream *substream)
 		cancel_delayed_work(&rtd->delayed_work);
 	}
 
-	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
-		for (i = 0; i < rtd->num_codecs; i++) {
-			codec_dai = rtd->codec_dais[i];
-			if (codec_dai->capture_active == 1)
-				snd_soc_dapm_stream_event(rtd,
-				SNDRV_PCM_STREAM_CAPTURE,
-				SND_SOC_DAPM_STREAM_START);
-		}
+	if (codec_dai && substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
+		if (codec_dai->capture_active == 1)
+			snd_soc_dapm_stream_event(rtd,
+			SNDRV_PCM_STREAM_CAPTURE,
+			SND_SOC_DAPM_STREAM_START);
 	}
 
 	for (i = 0; i < rtd->num_codecs; i++)
