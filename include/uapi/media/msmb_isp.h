@@ -909,8 +909,9 @@ enum msm_isp_ioctl_cmd_code {
 	MSM_ISP_DUAL_HW_MASTER_SLAVE_SYNC,
 	MSM_ISP_FETCH_ENG_MULTI_PASS_START,
 	MSM_ISP_MAP_BUF_START_MULTI_PASS_FE,
-	MSM_ISP_REQUEST_BUF_VER2,
-	MSM_ISP_DUAL_HW_LPM_MODE,
+	MSM_ISP_UPDATE_FE_FRAME_ID,
+	MSM_ISP_RESTART_FE,
+	MSM_ISP32_REQUEST_STREAM,
 };
 
 #define VIDIOC_MSM_VFE_REG_CFG \
@@ -1028,11 +1029,7 @@ enum msm_isp_ioctl_cmd_code {
 	_IOWR('V', MSM_ISP_MAP_BUF_START_MULTI_PASS_FE, \
 		struct msm_vfe_fetch_eng_multi_pass_start)
 
-#define VIDIOC_MSM_ISP_REQUEST_BUF_VER2 \
-	_IOWR('V', MSM_ISP_REQUEST_BUF_VER2, struct msm_isp_buf_request_ver2)
-
-#define VIDIOC_MSM_ISP_DUAL_HW_LPM_MODE \
-	_IOWR('V', MSM_ISP_DUAL_HW_LPM_MODE, \
-	struct msm_vfe_dual_lpm_mode)
+#define VIDIOC_MSM_ISP_BUF_DONE \
+	_IOWR('V', BASE_VIDIOC_PRIVATE+21, struct msm_isp32_event_data)
 
 #endif /* __MSMB_ISP__ */

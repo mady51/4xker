@@ -898,7 +898,6 @@ static long msm_isp_ioctl_unlocked(struct v4l2_subdev *sd,
 		mutex_lock(&vfe_dev->core_mutex);
 		MSM_ISP_DUAL_VFE_MUTEX_LOCK(vfe_dev);
 		rc = msm_isp_cfg_axi_stream(vfe_dev, arg);
-		MSM_ISP_DUAL_VFE_MUTEX_UNLOCK(vfe_dev);
 		mutex_unlock(&vfe_dev->core_mutex);
 		break;
 	case VIDIOC_MSM_ISP_AXI_HALT:
