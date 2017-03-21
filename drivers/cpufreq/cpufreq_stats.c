@@ -195,7 +195,24 @@ static int __cpufreq_stats_create_table(struct cpufreq_policy *policy)
 	if (!stats->time_in_state)
 		goto free_stat;
 
-	stats->freq_table = (unsigned int *)(stats->time_in_state + count);
+static void cpufreq_stats_update_policy_cpu(struct cpufreq_policy *policy)
+{
+	struct cpufreq_stats *stat;
+
+	pr_debug("Updating stats_table for new_cpu %u from last_cpu %u\n",
+			policy->cpu, policy->last_cpu);
+	stat = per_cpu(cpufreq_stats_table, policy->cpu);
+	if (stat) {
+		kfree(stat->time_in_state);
+		kfree(stat);
+	}
+
+	stat = per_cpu(cpufreq_stats_table, policy->last_cpu);
+	per_cpu(cpufreq_stats_table, policy->cpu) = per_cpu(cpufreq_stats_table,
+			policy->last_cpu);
+	per_cpu(cpufreq_stats_table, policy->last_cpu) = NULL;
+	stat->cpu = policy->cpu;
+}
 
 #ifdef CONFIG_CPU_FREQ_STAT_DETAILS
 	stats->trans_table = stats->freq_table + count;
