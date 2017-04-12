@@ -5018,7 +5018,11 @@ static int tasha_codec_enable_spline_src(struct snd_soc_codec *codec,
 					 int src_num,
 					 int event)
 {
+	u16 rx_path_cfg_reg;
+	u16 rx_path_ctl_reg;
+	u16 src_clk_reg;
 	u16 src_paired_reg = 0;
+	int *src_users, count, spl_src;
 	struct tasha_priv *tasha;
 	u16 rx_path_cfg_reg = WCD9335_CDC_RX1_RX_PATH_CFG0;
 	u16 rx_path_ctl_reg = WCD9335_CDC_RX1_RX_PATH_CTL;
