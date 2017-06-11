@@ -1702,7 +1702,8 @@ static void release_tty(struct tty_struct *tty, int idx)
 	tty->port->itty = NULL;
 	if (tty->link)
 		tty->link->port->itty = NULL;
-	tty_buffer_cancel_work(tty->port);
+	flush_kthread_work(&tty->port->buf.work);
+
 	if (tty->link)
 		tty_buffer_cancel_work(tty->link->port);
 

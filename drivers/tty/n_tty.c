@@ -204,7 +204,7 @@ static void n_tty_kick_worker(struct tty_struct *tty)
 		 */
 		WARN_RATELIMIT(test_bit(TTY_LDISC_HALTED, &tty->flags),
 			       "scheduling buffer work for halted ldisc\n");
-		tty_buffer_restart_work(tty->port);
+		queue_kthread_work(&tty->port->worker, &tty->port->buf.work);
 	}
 }
 
