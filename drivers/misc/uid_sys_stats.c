@@ -460,6 +460,44 @@ static void add_uid_io_stats(struct uid_entry *uid_entry,
 	io_slot->rchar += task->ioac.rchar;
 	io_slot->wchar += task->ioac.wchar;
 	io_slot->fsync += task->ioac.syscfs;
+#endif
+}
+#else
+static void add_uid_io_stats(struct uid_entry *uid_entry,
+			struct task_struct *task, int slot)
+{
+	return;
+}
+#endif
+
+static void compute_uid_io_bucket_stats(struct io_stats *io_bucket,
+					struct io_stats *io_curr,
+					struct io_stats *io_last,
+					struct io_stats *io_dead)
+{
+	s64 delta;
+
+	delta = io_curr->read_bytes + io_dead->read_bytes -
+		io_last->read_bytes;
+	if (delta > 0)
+		io_bucket->read_bytes += delta;
+
+	delta = io_curr->write_bytes + io_dead->write_bytes -
+		io_last->write_bytes;
+	if (delta > 0)
+		io_bucket->write_bytes += delta;
+
+	delta = io_curr->rchar + io_dead->rchar - io_last->rchar;
+	if (delta > 0)
+		io_bucket->rchar += delta;
+
+	delta = io_curr->wchar + io_dead->wchar - io_last->wchar;
+	if (delta > 0)
+		io_bucket->wchar += delta;
+
+	delta = io_curr->fsync + io_dead->fsync - io_last->fsync;
+	if (delta > 0)
+		io_bucket->fsync += delta;
 
 	add_uid_tasks_io_stats(uid_entry, task, slot);
 }
