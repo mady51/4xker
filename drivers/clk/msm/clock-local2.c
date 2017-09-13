@@ -37,6 +37,7 @@
 /* For clock without halt checking, wait this long after enables/disables. */
 #define HALT_CHECK_DELAY_US	500
 
+#define BLSP1_AHB_DISABLE_DELAY_US	50
 #define RCG_FORCE_DISABLE_DELAY_US	100
 
 /*
@@ -1177,6 +1178,12 @@ static int local_vote_clk_enable(struct clk *c)
 		local_vote_clk_disable(c);
 
 	return ret;
+}
+
+static void local_vote_clk_blsp1_ahb_disable(struct clk *c)
+{
+	local_vote_clk_disable(c);
+	udelay(BLSP1_AHB_DISABLE_DELAY_US);
 }
 
 static enum handoff local_vote_clk_handoff(struct clk *c)
@@ -2354,6 +2361,14 @@ struct clk_ops clk_ops_branch_hw_ctl = {
 struct clk_ops clk_ops_vote = {
 	.enable = local_vote_clk_enable,
 	.disable = local_vote_clk_disable,
+	.reset = local_vote_clk_reset,
+	.handoff = local_vote_clk_handoff,
+	.list_registers = local_vote_clk_list_registers,
+};
+
+struct clk_ops clk_ops_blsp1_ahb_vote = {
+	.enable = local_vote_clk_enable,
+	.disable = local_vote_clk_blsp1_ahb_disable,
 	.reset = local_vote_clk_reset,
 	.handoff = local_vote_clk_handoff,
 	.list_registers = local_vote_clk_list_registers,
