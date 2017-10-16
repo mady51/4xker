@@ -259,11 +259,7 @@ static inline void sysctl_head_put(struct ctl_table_header *head) { }
 /*
  * uid.c
  */
-#ifdef CONFIG_PROC_UID
 extern int proc_uid_init(void);
-#else
-static inline void proc_uid_init(void) { }
-#endif
 
 /*
  * proc_tty.c
