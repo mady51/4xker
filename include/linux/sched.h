@@ -2124,18 +2124,7 @@ struct task_struct {
 	unsigned int	sequential_io;
 	unsigned int	sequential_io_avg;
 #endif
-#ifdef CONFIG_DEBUG_ATOMIC_SLEEP
-	unsigned long	task_state_change;
-#endif
-	int pagefault_disabled;
-/* CPU-specific state of this task */
-	struct thread_struct thread;
-/*
- * WARNING: on x86, 'thread_struct' contains a variable-sized
- * structure.  It *MUST* be at the end of 'task_struct'.
- *
- * Do not put anything below here!
- */
+	atomic64_t *concurrent_active_time;
 };
 
 #ifdef CONFIG_ARCH_WANTS_DYNAMIC_TASK_STRUCT
