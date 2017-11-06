@@ -2488,6 +2488,257 @@ static irqreturn_t msm_dwc3_pwr_irq(int irq, void *data)
 	return IRQ_HANDLED;
 }
 
+static int dwc3_msm_power_get_property_usb(struct power_supply *psy,
+				  enum power_supply_property psp,
+				  union power_supply_propval *val)
+{
+	struct dwc3_msm *mdwc = container_of(psy, struct dwc3_msm,
+								usb_psy);
+	switch (psp) {
+	case POWER_SUPPLY_PROP_VOLTAGE_MAX:
+		if (mdwc->vbus_active && !mdwc->voltage_max)
+			mdwc->voltage_max = 5000000; /* default value */
+		val->intval = mdwc->voltage_max;
+		break;
+	case POWER_SUPPLY_PROP_CURRENT_MAX:
+		val->intval = mdwc->current_max;
+		break;
+	case POWER_SUPPLY_PROP_INPUT_CURRENT_MAX:
+		val->intval = mdwc->typec_current_max;
+		break;
+	case POWER_SUPPLY_PROP_PRESENT:
+		val->intval = mdwc->vbus_active;
+		break;
+	case POWER_SUPPLY_PROP_ONLINE:
+		val->intval = mdwc->online;
+		break;
+	case POWER_SUPPLY_PROP_REAL_TYPE:
+		val->intval = mdwc->usb_supply_type;
+		break;
+	case POWER_SUPPLY_PROP_TYPE:
+		val->intval = psy->type;
+		break;
+	case POWER_SUPPLY_PROP_HEALTH:
+		val->intval = mdwc->health_status;
+		break;
+	case POWER_SUPPLY_PROP_USB_OTG:
+		val->intval = !mdwc->id_state;
+		break;
+	default:
+		return -EINVAL;
+	}
+	return 0;
+}
+
+static int dwc3_msm_power_set_property_usb(struct power_supply *psy,
+				  enum power_supply_property psp,
+				  const union power_supply_propval *val)
+{
+	struct dwc3_msm *mdwc = container_of(psy, struct dwc3_msm,
+								usb_psy);
+	struct dwc3 *dwc = platform_get_drvdata(mdwc->dwc3);
+	int ret;
+	enum dwc3_id_state id;
+
+	switch (psp) {
+	case POWER_SUPPLY_PROP_USB_OTG:
+		id = val->intval ? DWC3_ID_GROUND : DWC3_ID_FLOAT;
+		if (mdwc->id_state == id)
+			break;
+
+		if (disable_host_mode && !id) {
+			dev_dbg(mdwc->dev, "%s: Ignoring ID change event :%d\n",
+						__func__, mdwc->id_state);
+			break;
+		}
+
+		/* Let OTG know about ID detection */
+		mdwc->id_state = id;
+		dbg_event(0xFF, "id_state", mdwc->id_state);
+		if (dwc->is_drd) {
+			dbg_event(0xFF, "stayID", 0);
+			pm_stay_awake(mdwc->dev);
+			queue_delayed_work(mdwc->dwc3_resume_wq,
+					&mdwc->resume_work, 0);
+		}
+		break;
+	/* PMIC notification for DP_DM state */
+	case POWER_SUPPLY_PROP_DP_DM:
+		ret = usb_phy_change_dpdm(mdwc->hs_phy, val->intval);
+		if (ret) {
+			dev_dbg(mdwc->dev, "%s: error in phy dpdm update :%d\n",
+								__func__, ret);
+			return ret;
+		}
+		break;
+	/* Process PMIC notification in PRESENT prop */
+	case POWER_SUPPLY_PROP_PRESENT:
+		dev_dbg(mdwc->dev, "%s: notify xceiv event with val:%d\n",
+							__func__, val->intval);
+		/*
+		 * Now otg_sm_work() state machine waits for USB cable status.
+		 * Hence here it makes sure that schedule resume work only if
+		 * there is change in USB cable also if there is no USB cable
+		 * notification.
+		 */
+		if (mdwc->otg_state == OTG_STATE_UNDEFINED) {
+			mdwc->vbus_active = val->intval;
+			queue_delayed_work(mdwc->dwc3_resume_wq,
+					&mdwc->resume_work, 0);
+			break;
+		}
+
+		if (mdwc->vbus_active == val->intval)
+			break;
+
+		mdwc->vbus_active = val->intval;
+		if (dwc->is_drd && !mdwc->in_restart) {
+			dbg_event(0xFF, "Q RW (vbus)", val->intval);
+			dbg_event(0xFF, "stayVbus", 0);
+			/* Ignore !vbus on stop_host */
+			if (mdwc->vbus_active || test_bit(ID, &mdwc->inputs)) {
+				pm_stay_awake(mdwc->dev);
+				queue_delayed_work(mdwc->dwc3_resume_wq,
+					&mdwc->resume_work, 0);
+			}
+		}
+		break;
+	case POWER_SUPPLY_PROP_ONLINE:
+		mdwc->online = val->intval;
+		break;
+	case POWER_SUPPLY_PROP_VOLTAGE_MAX:
+		mdwc->voltage_max = val->intval;
+		break;
+	case POWER_SUPPLY_PROP_CURRENT_MAX:
+		mdwc->current_max = val->intval;
+		break;
+	case POWER_SUPPLY_PROP_INPUT_CURRENT_MAX:
+		mdwc->typec_current_max = val->intval;
+
+		dbg_event(0xFF, "TYPE C CURMAX)", val->intval);
+		/* Update chg_current as per type-c charger detection on VBUS */
+		if (mdwc->chg_type != DWC3_INVALID_CHARGER) {
+			dev_dbg(mdwc->dev, "update type-c charger\n");
+			dwc3_msm_gadget_vbus_draw(mdwc,
+						mdwc->bc1p2_current_max);
+		}
+		break;
+	case POWER_SUPPLY_PROP_REAL_TYPE:
+		mdwc->usb_supply_type = val->intval;
+		/*
+		 * Update TYPE property to DCP for HVDCP/HVDCP3 charger types
+		 * so that they can be recongized as AC chargers by healthd.
+		 * Don't report UNKNOWN charger type to prevent healthd missing
+		 * detecting this power_supply status change.
+		 */
+		if (mdwc->usb_supply_type == POWER_SUPPLY_TYPE_USB_HVDCP_3
+			|| mdwc->usb_supply_type == POWER_SUPPLY_TYPE_USB_HVDCP)
+			psy->type = POWER_SUPPLY_TYPE_USB_DCP;
+		else if (mdwc->usb_supply_type == POWER_SUPPLY_TYPE_UNKNOWN)
+			psy->type = POWER_SUPPLY_TYPE_USB;
+		else
+			psy->type = mdwc->usb_supply_type;
+		switch (mdwc->usb_supply_type) {
+		case POWER_SUPPLY_TYPE_USB:
+			mdwc->chg_type = DWC3_SDP_CHARGER;
+			mdwc->voltage_max = MICRO_5V;
+			break;
+		case POWER_SUPPLY_TYPE_USB_DCP:
+			mdwc->chg_type = DWC3_DCP_CHARGER;
+			mdwc->voltage_max = MICRO_5V;
+			break;
+		case POWER_SUPPLY_TYPE_DASH:
+			mdwc->chg_type = DWC3_DCP_CHARGER;
+			break;
+		case POWER_SUPPLY_TYPE_USB_HVDCP:
+			mdwc->chg_type = DWC3_DCP_CHARGER;
+			mdwc->voltage_max = MICRO_9V;
+			dwc3_msm_gadget_vbus_draw(mdwc, hvdcp_max_current);
+			break;
+		case POWER_SUPPLY_TYPE_USB_CDP:
+			mdwc->chg_type = DWC3_CDP_CHARGER;
+			mdwc->voltage_max = MICRO_5V;
+			break;
+		case POWER_SUPPLY_TYPE_USB_ACA:
+			mdwc->chg_type = DWC3_PROPRIETARY_CHARGER;
+			break;
+		default:
+			mdwc->chg_type = DWC3_INVALID_CHARGER;
+			break;
+		}
+
+		if (mdwc->chg_type != DWC3_INVALID_CHARGER)
+			mdwc->chg_state = USB_CHG_STATE_DETECTED;
+
+		dev_dbg(mdwc->dev, "%s: charger type: %s\n", __func__,
+				chg_to_string(mdwc->chg_type));
+		break;
+	case POWER_SUPPLY_PROP_HEALTH:
+		mdwc->health_status = val->intval;
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	power_supply_changed(&mdwc->usb_psy);
+	return 0;
+}
+
+static int
+dwc3_msm_property_is_writeable(struct power_supply *psy,
+				enum power_supply_property psp)
+{
+	switch (psp) {
+	case POWER_SUPPLY_PROP_USB_OTG:
+	case POWER_SUPPLY_PROP_PRESENT:
+	case POWER_SUPPLY_PROP_VOLTAGE_MAX:
+	case POWER_SUPPLY_PROP_INPUT_CURRENT_MAX:
+	case POWER_SUPPLY_PROP_REAL_TYPE:
+		return 1;
+	default:
+		break;
+	}
+
+	return 0;
+}
+
+
+static char *dwc3_msm_pm_power_supplied_to[] = {
+	"battery",
+	"bms",
+	"bcl",
+};
+
+static enum power_supply_property dwc3_msm_pm_power_props_usb[] = {
+	POWER_SUPPLY_PROP_PRESENT,
+	POWER_SUPPLY_PROP_ONLINE,
+	POWER_SUPPLY_PROP_VOLTAGE_MAX,
+	POWER_SUPPLY_PROP_CURRENT_MAX,
+	POWER_SUPPLY_PROP_INPUT_CURRENT_MAX,
+	POWER_SUPPLY_PROP_TYPE,
+	POWER_SUPPLY_PROP_HEALTH,
+	POWER_SUPPLY_PROP_USB_OTG,
+	POWER_SUPPLY_PROP_REAL_TYPE,
+};
+
+static irqreturn_t dwc3_pmic_id_irq(int irq, void *data)
+{
+	struct dwc3_msm *mdwc = data;
+	struct dwc3 *dwc = platform_get_drvdata(mdwc->dwc3);
+	enum dwc3_id_state id;
+
+	/* If we can't read ID line state for some reason, treat it as float */
+	id = !!irq_read_line(irq);
+	if (mdwc->id_state != id) {
+		mdwc->id_state = id;
+		dbg_event(0xFF, "stayIDIRQ", 0);
+		pm_stay_awake(mdwc->dev);
+		queue_delayed_work(mdwc->dwc3_resume_wq, &mdwc->resume_work, 0);
+	}
+
+	return IRQ_HANDLED;
+}
+
 static int dwc3_cpu_notifier_cb(struct notifier_block *nfb,
 		unsigned long action, void *hcpu)
 {

@@ -2874,8 +2874,12 @@ static void dwc3_gadget_reset_interrupt(struct dwc3 *dwc)
 	dwc3_usb3_phy_suspend(dwc, false);
 	usb_gadget_vbus_draw(&dwc->gadget, 100);
 
-	dwc3_reset_gadget(dwc);
-	dbg_event(0xFF, "BUS RST", 0);
+	dwc3_gadget_usb3_phy_suspend(dwc, false);
+
+	// usb_gadget_vbus_draw(&dwc->gadget, 0);
+
+	if (dwc->gadget.speed != USB_SPEED_UNKNOWN)
+		dwc3_disconnect_gadget(dwc);
 
 	reg = dwc3_readl(dwc->regs, DWC3_DCTL);
 	reg &= ~DWC3_DCTL_TSTCTRL_MASK;

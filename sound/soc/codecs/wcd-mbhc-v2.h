@@ -12,6 +12,7 @@
 #ifndef __WCD_MBHC_V2_H__
 #define __WCD_MBHC_V2_H__
 
+#include<linux/switch.h>
 #include <linux/wait.h>
 #include <linux/stringify.h>
 #include <linux/power_supply.h>
@@ -274,7 +275,8 @@ struct wcd_mbhc_config {
 	bool gnd_det_en;
 	int key_code[WCD_MBHC_KEYCODE_NUM];
 	uint32_t linein_th;
-	bool moisture_en;
+	struct wcd_mbhc_moisture_cfg moist_cfg;
+    int headset_type;
 	int mbhc_micbias;
 	int anc_micbias;
 	bool enable_anc_mic_detect;
@@ -461,7 +463,9 @@ struct wcd_mbhc {
 	struct completion btn_press_compl;
 	struct mutex hphl_pa_lock;
 	struct mutex hphr_pa_lock;
+	struct switch_dev wcd9xxx_sdev;
 
+    bool jackAlreadReport;
 	unsigned long intr_status;
 	bool is_hph_ocp_pending;
 
