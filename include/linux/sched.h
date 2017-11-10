@@ -2125,6 +2125,7 @@ struct task_struct {
 	unsigned int	sequential_io_avg;
 #endif
 	atomic64_t *concurrent_active_time;
+	atomic64_t *concurrent_policy_time;
 };
 
 #ifdef CONFIG_ARCH_WANTS_DYNAMIC_TASK_STRUCT
