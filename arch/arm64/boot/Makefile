@@ -27,12 +27,6 @@ endif
 $(obj)/Image: vmlinux FORCE
 	$(call if_changed,objcopy)
 
-$(obj)/Image.bz2: $(obj)/Image FORCE
-	$(call if_changed,bzip2)
-
-$(obj)/Image-dtb: $(obj)/Image $(DTB_OBJS) FORCE
-	$(call if_changed,cat)
-
 $(obj)/Image.gz: $(obj)/Image FORCE
 	$(call if_changed,gzip)
 
