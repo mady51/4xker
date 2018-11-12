@@ -863,7 +863,8 @@ fail_attach:
 static int msm_audio_smmu_init(struct device *dev)
 {
 	struct dma_iommu_mapping *mapping;
-	int ret;
+	int ret = -ENODEV;
+	int disable_htw = 1;
 
 	mapping = arm_iommu_create_mapping(
 					msm_iommu_get_bus(dev),
